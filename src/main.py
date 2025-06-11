@@ -1,11 +1,16 @@
 import sys
-from gui.app import App
+from PyQt6.QtWidgets import QApplication
+from main_window import MainWindow
+
 
 def main():
     print("Hello from tubes3-hrdbawel!")
 
-    app = App(argv=sys.argv)
-    app.root.show()
+    app = QApplication(sys.argv)
+
+    window = MainWindow()
+    window.show()
+
     sys.exit(app.exec())
 
 if __name__ == "__main__":
