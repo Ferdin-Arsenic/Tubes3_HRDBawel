@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QPushButton, QSpinBox
 from PyQt6.QtCore import pyqtSignal, Qt
 from gui.algorithm_choice import AlgorithmButtons
+from models.search import SearchParams
 
 class InputFields(QWidget):
-    search_initiate = pyqtSignal(dict)   # Search button signal
+    search_initiate = pyqtSignal(SearchParams)   # Search button signal
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -64,9 +65,9 @@ class InputFields(QWidget):
         input = self.get_input()
         self.search_initiate.emit(input)
 
-    def get_input(self) -> dict:
-        return {
-            "keywords": self.keywords_input.toPlainText().strip().split(","),
-            "algorithm": self.algorithm_choice.get_selected_algorithm(),
-            "top_matches": self.top_matches_input.value()
-        }
+    def get_input(self) -> SearchParams:
+        return SearchParams(
+            self.keywords_input.toPlainText().strip().split(","),
+            self.algorithm_choice.get_selected_algorithm(),
+            self.top_matches_input.value()
+        )

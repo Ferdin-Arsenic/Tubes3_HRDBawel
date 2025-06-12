@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QButtonGroup, QRadioButton
 from PyQt6.QtCore import Qt
+from models.search import SearchAlgorithm
 
 class PillButton(QRadioButton):
     def __init__(self, text, parent=None):
@@ -8,10 +9,6 @@ class PillButton(QRadioButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
 class AlgorithmButtons(QWidget):
-    CHOICES = [
-        "KMP", "BM", "Aho-Corasick"
-    ]
-
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -23,8 +20,8 @@ class AlgorithmButtons(QWidget):
         self.layout.setSpacing(5)
         
         
-        for id, choice in enumerate(AlgorithmButtons.CHOICES):
-            button = PillButton(choice, self)
+        for id, choice in enumerate(SearchAlgorithm):
+            button = PillButton(choice.value, self)
             self.group.addButton(button, id)
             self.layout.addWidget(button)
             if id == 0:
@@ -36,5 +33,7 @@ class AlgorithmButtons(QWidget):
         # print("Selected algorithm:", AlgorithmButtons.CHOICES[buttonId])
         pass
 
-    def get_selected_algorithm(self) -> str:
-        return AlgorithmButtons.CHOICES[self.group.checkedId()]
+    def get_selected_algorithm(self) -> SearchAlgorithm:
+        for button in self.group.buttons():
+            if button.isChecked():
+                return SearchAlgorithm(button.text())

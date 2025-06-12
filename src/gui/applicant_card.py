@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QFrame, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, Qt
-from models.applicant_match_data import ApplicantMatchData
+from models.search import ApplicantMatchData
 
 class ApplicantCard(QWidget):
     view_summary = pyqtSignal(int)

@@ -2,9 +2,10 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal
 from gui.input import InputFields
 from gui.result import ResultDisplay
+from models.search import SearchParams
 
 class SearchPage(QWidget):
-    search_initiate = pyqtSignal(dict)  # Signal to initiate search with parameters
+    search_initiate = pyqtSignal(SearchParams)  # Signal to initiate search with parameters
     view_summary = pyqtSignal(int)  # Signal to view summary
     view_cv = pyqtSignal(int)       # Signal to view CV (launch a window with the CV PDF)
 
