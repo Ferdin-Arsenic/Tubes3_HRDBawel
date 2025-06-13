@@ -5,8 +5,8 @@ from gui.summary_page import SummaryPage
 from models.search import SearchParams, ApplicantMatchData
 
 #from database.cv_database import DBConnection 
-from lib.kmp import KMP
-#from lib.bm import BM
+#from lib.kmp import KMP
+from lib.bm import BM
 #from lib.aho_corasick import aho_corasick
 from lib.levenshtein import levenshtein_distance
 
@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
         exact_match_results = {} 
         found_keywords = set()
 
-        search_function = KMP # Ganti berdasarkan pilihan pengguna (BM atau Aho-C)
+        search_function = BM # Ganti berdasarkan pilihan pengguna (BM atau Aho-C)
 
         for cv_id, cv_text in all_cv_texts.items():
             for keyword in search_params.keywords:
