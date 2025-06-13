@@ -45,9 +45,9 @@ class SearchPage(QWidget):
         input_fields.search_initiate.connect(self.search_initiate)
 
         # Result display in the right panel
-        result_display = ResultDisplay(right_panel)
-        result_display.view_summary.connect(self.view_summary)
-        result_display.view_cv.connect(self.view_cv)
+        self.result_display = ResultDisplay(right_panel)
+        self.result_display.view_summary.connect(self.view_summary)
+        self.result_display.view_cv.connect(self.view_cv)
 
         left_layout.addWidget(input_fields)
-        right_layout.addWidget(result_display)
+        right_layout.addWidget(self.result_display)

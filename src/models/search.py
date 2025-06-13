@@ -5,7 +5,6 @@ class SearchAlgorithm(Enum):
     KMP = "KMP"
     BM = "BM"
     AHO_CORASICK = "Aho-Corasick"
-    Levensthein = "Levenshtein"
 
 @dataclass
 class ApplicantMatchData:
