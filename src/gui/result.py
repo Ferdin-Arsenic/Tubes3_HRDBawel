@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QGridLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QGridLayout, QSpacerItem,QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import pyqtSignal, Qt
 from gui.applicant_card import ApplicantCard
-from models.search import ApplicantMatchData
+from models.search import ApplicantMatchData, SearchResult
 
 class ResultDisplay(QWidget):
     view_summary = pyqtSignal(int)  # Signal to view summary
@@ -29,8 +29,8 @@ class ResultDisplay(QWidget):
         test_data: list[ApplicantMatchData] = [
             ApplicantMatchData(detail_id=i, name=f"Applicant {i}", match_count=i+1, matched_keywords={"python":1}) for i in range(10)
         ]
-        self.set_results(test_data)
-        self.stack.setCurrentWidget(self.result_page)
+        self.set_results(SearchResult(applicants=[], cvs_scanned=102, runtime=100))
+        self.display_results()
 
     """ Page Builder """
     def initialize_widgets(self, page_stack:QStackedWidget) -> None:
@@ -48,6 +48,8 @@ class ResultDisplay(QWidget):
         container = QGridLayout(self.result_page)
         container.setContentsMargins(0, 5, 0, 5)
         container.setSpacing(0)
+        container.setRowMinimumHeight(0, 25)
+        container.setRowMinimumHeight(1, 25)
         container.setRowStretch(2, 1)
         container.setRowMinimumHeight(3, 10)
         container.setRowStretch(4, 1)
@@ -59,22 +61,22 @@ class ResultDisplay(QWidget):
         left_button = QPushButton("◀", clicked=self.on_prev_clicked)
         left_button.setStyleSheet("font-size: 25px;")
         left_button.setMaximumWidth(25)
-        container.addWidget(left_button, 0, 0, -1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        container.addWidget(left_button, 2, 0, 3, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         right_button = QPushButton("▶", clicked=self.on_next_clicked)
         right_button.setStyleSheet("font-size: 25px;")
         right_button.setMaximumWidth(25)
-        container.addWidget(right_button, 0, 4, -1, 1, alignment=Qt.AlignmentFlag.AlignRight)
+        container.addWidget(right_button, 2, 4, 3, 1, alignment=Qt.AlignmentFlag.AlignRight)
 
-        result_summary = QLabel("5 applicants found")
-        result_summary.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; font-weight: bold;")
-        container.addWidget(result_summary, 0, 1, 1, 3, Qt.AlignmentFlag.AlignLeft)
-        search_statistics = QLabel("searched 100 CVs under 100ms")
-        search_statistics.setStyleSheet("font-size: 10px; font-family: Inter, sans-serif; margin: 0px 0px 5px 0px;")
-        container.addWidget(search_statistics, 1, 1, 1, 3, Qt.AlignmentFlag.AlignLeft)
+        self.result_summary = QLabel("5 applicants found")
+        self.result_summary.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; font-weight: bold;")
+        container.addWidget(self.result_summary, 0, 1, 1, 3, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+        self.search_statistics = QLabel("searched 100 CVs under 100ms")
+        self.search_statistics.setStyleSheet("font-size: 10px; font-family: Inter, sans-serif; margin: 0px 0px 5px 0px;")
+        container.addWidget(self.search_statistics, 1, 1, 1, 3, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
-        page_label = QLabel("0/0")
-        page_label.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #444444;")
-        container.addWidget(page_label, 5, 1, -1, 3, Qt.AlignmentFlag.AlignCenter)
+        self.page_label = QLabel("0 / 0")
+        self.page_label.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #444444; margin: 0px;")
+        container.addWidget(self.page_label, 5, 1, -1, 3, Qt.AlignmentFlag.AlignCenter)
 
         # Place applicant card stacks
         cards_columns = [1, 3]
@@ -89,43 +91,56 @@ class ResultDisplay(QWidget):
     def initialize_widgets_blank_page(self) -> None:
         self.blank_page.setStyleSheet("background-color: #f0f0f0; color: #000000;")        
         blank_layout = QVBoxLayout(self.blank_page)
-        blank_layout.setContentsMargins(5, 5, 5, 5)
+        blank_layout.setContentsMargins(0, 0, 0, 0)
         blank_layout.setSpacing(0)
-        blank_label = QLabel("Search for applicants to see results here")
-        blank_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        blank_label.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; color: #888888;")
-        blank_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        blank_layout.addWidget(blank_label)
+        
+        self.blank_label = QLabel("Search for applicants to see results here")
+        self.blank_label.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; color: #9a9a9a;")
+        self.blank_sublabel = QLabel("Start by entering keywords in the left panel")
+        self.blank_sublabel.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #9a9a9a;")
+        
+        blank_layout.addStretch(1)
+        blank_layout.addWidget(self.blank_label, 0, Qt.AlignmentFlag.AlignHCenter)
+        blank_layout.addWidget(self.blank_sublabel, 0, Qt.AlignmentFlag.AlignHCenter)
+        blank_layout.addStretch(1)
 
     """ Controls """
-    def clear_results(self) -> None:
-        self.set_results([])  # Clear the results by setting an empty list
-        self.pages.setCurrentWidget(self.blank_page)
+    def clear_results(self, empty_result: bool = False) -> None:
+        if empty_result:
+            self.blank_label.setText("No applicant found")
+            self.blank_sublabel.setText(self.search_statistics.text())
+        else:
+            self.blank_label.setText("Search for applicants to see results here")
+            self.blank_sublabel.setText("Start by entering keywords in the left panel")
+            self.set_results(SearchResult([], 0, 0))  # Clear the results by setting an empty list
+        self.stack.setCurrentWidget(self.blank_page)
+        print("Cleared results and switched to blank page.")
     
     def display_results(self) -> None:
-        if not self.result_cards:
-            self.clear_results()
-            return
-        
-        # Paginate the results by shifting through the stacked widgets
-        for card_stack in self.result_cards:
-            widget = card_stack.widget(self.current_page-1)
-            card_stack.setCurrentWidget(widget)
+        if self.page_count == 0 or self.current_page == 0:
+            self.clear_results(True)
+        else:    
+            # Paginate the results by shifting through the stacked widgets
+            for card_stack in self.result_cards:
+                widget = card_stack.widget(self.current_page-1)
+                card_stack.setCurrentWidget(widget)
 
-        # self.stack.setCurrentWidget(self.result_page)
-
-    def set_results(self, results: list[ApplicantMatchData]) -> None:
-        self.page_count = (len(results) + self.results_per_page - 1) // self.results_per_page
+    def set_results(self, results: SearchResult) -> None:
+        self.page_count = (len(results.applicants) + self.results_per_page - 1) // self.results_per_page
         self.current_page = 1 if self.page_count > 0 else 0
         
+        self.page_label.setText(f"{self.current_page} / {self.page_count}")
+        self.result_summary.setText(f"{len(results.applicants)} applicants found")
+        self.search_statistics.setText(f"searched {results.cvs_scanned} CVs under {results.runtime}ms")
+
         for stack in self.result_cards:
             while stack.count() > 0:
                 widget = stack.widget(0)
                 stack.removeWidget(widget)
                 widget.deleteLater()
         for i in range(self.page_count * self.results_per_page):
-            if i < len(results):
-                card = ApplicantCard(results[i])
+            if i < len(results.applicants):
+                card = ApplicantCard(results.applicants[i])
                 card.view_summary.connect(self.view_summary)
                 card.view_cv.connect(self.view_cv)
                 self.result_cards[i % self.results_per_page].addWidget(card)
@@ -134,13 +149,13 @@ class ResultDisplay(QWidget):
                 self.result_cards[i % self.results_per_page].addWidget(blank_space)
 
     def on_prev_clicked(self) -> None:
-        print("[Prev] Current page:", self.current_page, "Page count:", self.page_count)
         if self.current_page > 1:
             self.current_page -= 1
             self.display_results()
+            self.page_label.setText(f"{self.current_page} / {self.page_count}")
         
     def on_next_clicked(self) -> None:
-        print("[Next] Current page:", self.current_page, "Page count:", self.page_count)
         if self.current_page < self.page_count:
             self.current_page += 1
             self.display_results()
+            self.page_label.setText(f"{self.current_page} / {self.page_count}")

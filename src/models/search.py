@@ -17,7 +17,7 @@ class ApplicantMatchData:
 class SearchResult:
     applicants: list[ApplicantMatchData]
     cvs_scanned: int
-    runtime: float
+    runtime: float  # In milliseconds
 
 @dataclass
 class SearchParams:
