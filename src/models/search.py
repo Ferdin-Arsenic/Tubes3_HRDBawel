@@ -1,6 +1,24 @@
 from dataclasses import dataclass
 from enum import Enum
+from datetime import datetime
 
+# Database models
+@dataclass
+class ApplicantDetail:
+    detail_id: int
+    applicant_id: int
+    application_role: str
+    cv_path: str
+
+@dataclass
+class ApplicantCV:
+    detail_id: int
+    name: str
+    birthdate: datetime
+    address: str
+    contacts: list[str]
+
+# Search data
 class SearchAlgorithm(Enum):
     KMP = "KMP"
     BM = "BM"
@@ -24,3 +42,31 @@ class SearchParams:
     keywords: list[str]
     algorithm: SearchAlgorithm
     top_matches: int
+
+# Summary data
+@dataclass
+class EducationEntry:
+    institution: str
+    program: str
+    start_date: str
+    end_date: str
+
+@dataclass
+class WorkExperienceEntry:
+    position: str
+    company: str
+    start_date: str
+    end_date: str
+    description: str
+
+@dataclass
+class CVSummary:
+    name: str
+    birthdate: datetime
+    address: str
+    contacts: list[str] # Phone, emails, etc
+    description: str
+
+    skills: list[str]
+    education: list[EducationEntry]
+    work_experience: list[WorkExperienceEntry]
