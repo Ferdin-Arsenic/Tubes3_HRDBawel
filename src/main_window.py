@@ -60,7 +60,6 @@ class MainWindow(QMainWindow):
         all_files = [f for f in os.listdir(text_files_dir) if f.endswith(".txt")]
         final_results_map = {}
 
-        # TAHAP 1: PENCARIAN EXACT MATCH
         for filename in all_files:
             applicant_id = os.path.splitext(filename)[0]
             file_path = os.path.join(text_files_dir, filename)
@@ -88,7 +87,6 @@ class MainWindow(QMainWindow):
                     matched_keywords=exact_matches,
                 )
 
-        # TAHAP 2: PROSES HASIL
         if final_results_map:
             end_time = time.time()
             runtime_ms = (end_time - start_time) * 1000
@@ -99,7 +97,6 @@ class MainWindow(QMainWindow):
             self.search_page.result_display.set_results(top_results, runtime_ms, 0, is_fuzzy=False)
             return
 
-        # JIKA TIDAK ADA EXACT MATCH, JALANKAN FUZZY SEARCH
         print("[DEBUG] No exact matches found. Falling back to fuzzy search.")
         SIMILARITY_THRESHOLD = 80.0
         fuzzy_results_map = {}
@@ -111,8 +108,6 @@ class MainWindow(QMainWindow):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read().lower()
-                    # --- PERBAIKAN DI SINI ---
-                    # Membersihkan teks dari tanda baca untuk mendapatkan kata-kata murni
                     words_in_cv = set(re.findall(r'[a-z]+', content))
             except (IOError, FileNotFoundError):
                 continue
