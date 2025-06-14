@@ -1,48 +1,46 @@
-def bad_char_heuristic(pattern: str, size: int) -> list[int]:
-    """
-    Preprocessing untuk menghasilkan tabel Bad Character.
-    Tabel ini menyimpan kemunculan terakhir dari setiap karakter dalam pola.
-    """
-    bad_char = [-1] * 256  
+# File: src/lib/bm.py
 
-    # Isi nilai kemunculan terakhir dari karakter yang ada di pola
-    for i in range(size):
-        bad_char[ord(pattern[i])] = i
-        
-    return bad_char
-
-def BM(text: str, pattern: str) -> list[int]:
+def last_occurance(pattern):
     """
-    Algoritma Boyer-Moore (BM) untuk pencarian substring.
-
-    Mencari kemunculan pasti dari sebuah pola dalam teks.
-    Menggunakan heuristik 'Bad Character' untuk mempercepat pencarian.
-    Mengembalikan daftar indeks awal di mana pola ditemukan dalam teks.
+    Membuat tabel 'bad character (last_occurance)' menggunakan dictionary untuk mendukung semua karakter (Unicode).
     """
-    matches = []
-    m = len(pattern)
+    last_char_table = {}
+    pattern_length = len(pattern)
+    for i in range(pattern_length):
+        last_char_table[pattern[i]] = i
+    return last_char_table
+
+def BM(text, pattern):
+    """
+    Fungsi pencarian string dengan algoritma Boyer-Moore yang sudah diperbaiki
+    untuk menangani semua jenis karakter (Unicode).
+    """
     n = len(text)
+    m = len(pattern)
 
     if m == 0 or n == 0 or m > n:
-        return []
+        return False
 
-    bad_char = bad_char_heuristic(pattern, m)
-    
-    s = 0  #SHIFT
-    while(s <= n - m):
+    bad_char_table = last_occurance(pattern)
+    shift = 0
+
+    while shift <= n - m:
         j = m - 1
-
-        while j >= 0 and pattern[j] == text[s + j]:
+        
+        while j >= 0 and pattern[j] == text[shift + j]:
             j -= 1
+
         if j < 0:
-            matches.append(s)
-
-            s += (m - bad_char[ord(text[s + m])] if s + m < n else 1)
+            return True
+        
         else:
-            s += max(1, j - bad_char[ord(text[s + j])])
+            current_char_in_text = text[shift + j]
             
-    return matches
-
+            last_occurrence = bad_char_table.get(current_char_in_text, -1)
+            
+            shift += max(1, j - last_occurrence)
+            
+    return False 
 if __name__ == "__main__":
     text = "BILAKATADARIKATAMANAKATAKATA"
     pattern = "KATA"

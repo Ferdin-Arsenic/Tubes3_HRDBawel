@@ -1,132 +1,174 @@
 import math
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QGridLayout, QSpacerItem,QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import pyqtSignal, Qt
 from gui.applicant_card import ApplicantCard
-from models.search import ApplicantMatchData
+from models.search import ApplicantMatchData, SearchResult
 
 class ResultDisplay(QWidget):
-    view_summary = pyqtSignal(int)
-    view_cv = pyqtSignal(int)
+    view_summary = pyqtSignal(int)  # Signal to view summary
+    view_cv = pyqtSignal(int)       # Signal to view CV (launch a window with the CV PDF)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setContentsMargins(5, 5, 5, 5)
-        self.setStyleSheet("color: #000000;")
-
-        # --- Atribut untuk data dan paginasi ---
-        self.all_results: list[ApplicantMatchData] = []
+        # --- Bagian ini dipertahankan dari kode Anda ---
+        self.stack = QStackedWidget()
+        pages_layout = QVBoxLayout(self)
+        pages_layout.setContentsMargins(0,0,0,0)
+        pages_layout.addWidget(self.stack)
+        
         self.page_count = 0
-        self.current_page = 0
+        self.current_page = 0 # Menggunakan 1-based index sesuai kode asli Anda
         self.results_per_page = 4
+        self.result_cards: list[QStackedWidget] = [QStackedWidget() for _ in range(self.results_per_page)]
 
-        # --- Setup Widget dan Layout (Struktur Final yang Benar dan Bersih) ---
-
-        # 1. Label untuk state awal (saat belum ada hasil)
-        self.blank_label = QLabel("Search for applicants to see results here")
-        self.blank_label.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; color: #444444;")
-        self.blank_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # 2. Widget utama yang menampung semua elemen hasil pencarian
-        self.results_widget = QWidget()
+        self.initialize_widgets(self.stack)
         
-        main_results_layout = QVBoxLayout(self.results_widget)
-        main_results_layout.setSpacing(5)
+        # Mengatur halaman awal ke blank page
+        self.stack.setCurrentWidget(self.blank_page)
 
-        # 2a. Label Waktu Eksekusi
-        self.timing_label = QLabel("")
-        self.timing_label.setStyleSheet("font-size: 11px; font-family: Inter, sans-serif; color: #555555;")
-        self.timing_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_results_layout.addWidget(self.timing_label)
+    """ Page Builder (Dipertahankan Penuh) """
+    def initialize_widgets(self, page_stack:QStackedWidget) -> None:
+        self.blank_page = QWidget()
+        self.result_page = QWidget()
+        page_stack.addWidget(self.blank_page)
+        page_stack.addWidget(self.result_page)
+        self.initialize_widgets_result_page()
+        self.initialize_widgets_blank_page()
 
-        # 2b. Layout horizontal untuk baris hasil (tombol navigasi + kartu)
-        results_row_layout = QHBoxLayout()
-        
+    def initialize_widgets_result_page(self) -> None:
+        # Seluruh isi metode ini dipertahankan dari kode Anda
+        self.result_page.setContentsMargins(0, 0, 0, 0)
+        self.result_page.setStyleSheet("color: #000000;")
+        container = QGridLayout(self.result_page)
+        container.setContentsMargins(0, 5, 0, 5)
+        container.setSpacing(0)
+        container.setRowMinimumHeight(0, 25)
+        container.setRowMinimumHeight(1, 25)
+        container.setRowStretch(2, 1)
+        container.setRowMinimumHeight(3, 10)
+        container.setRowStretch(4, 1)
+        container.setColumnMinimumWidth(0, 25)
+        container.setColumnStretch(1, 1)
+        container.setColumnStretch(3, 1)
+        container.setColumnMinimumWidth(4, 25)
+
         left_button = QPushButton("◀", clicked=self.on_prev_clicked)
         left_button.setStyleSheet("font-size: 25px; border: none; background: transparent;")
-        left_button.setFixedWidth(25)
-        results_row_layout.addWidget(left_button, alignment=Qt.AlignmentFlag.AlignVCenter)
-
-        self.result_card_layout = QGridLayout()
-        self.result_card_layout.setSpacing(10)
-        results_row_layout.addLayout(self.result_card_layout)
-
+        container.addWidget(left_button, 2, 0, 3, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         right_button = QPushButton("▶", clicked=self.on_next_clicked)
         right_button.setStyleSheet("font-size: 25px; border: none; background: transparent;")
-        right_button.setFixedWidth(25)
-        results_row_layout.addWidget(right_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        container.addWidget(right_button, 2, 4, 3, 1, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self.result_summary = QLabel("0 applicants found")
+        self.result_summary.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; font-weight: bold;")
+        container.addWidget(self.result_summary, 0, 1, 1, 3, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+        self.search_statistics = QLabel("Please initiate a search.")
+        self.search_statistics.setStyleSheet("font-size: 10px; font-family: Inter, sans-serif; margin: 0px 0px 5px 0px;")
+        container.addWidget(self.search_statistics, 1, 1, 1, 3, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+        self.page_label = QLabel("0 / 0")
+        self.page_label.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #444444; margin: 0px;")
+        container.addWidget(self.page_label, 5, 1, -1, 3, Qt.AlignmentFlag.AlignCenter)
+
+        cards_columns = [1, 3]
+        cards_rows = [2, 4]
+        columns_count = len(cards_columns)
+        for i, stack_widget in enumerate(self.result_cards):
+            row = cards_rows[i // columns_count]
+            col = cards_columns[i % columns_count]
+            container.addWidget(stack_widget, row, col, 1, 1, Qt.AlignmentFlag.AlignLeft)
+
+    def initialize_widgets_blank_page(self) -> None:
+        # Kode ini dipertahankan sepenuhnya
+        self.blank_page.setStyleSheet("color: #000000;")        
+        blank_layout = QVBoxLayout(self.blank_page)
+        self.blank_label = QLabel("Search for applicants to see results here")
+        self.blank_label.setStyleSheet("font-size: 14px; font-family: Inter, sans-serif; color: #444444;")
+        self.blank_sublabel = QLabel("Start by entering keywords in the left panel")
+        self.blank_sublabel.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #444444;")
+        blank_layout.addStretch(1)
+        blank_layout.addWidget(self.blank_label, 0, Qt.AlignmentFlag.AlignHCenter)
+        blank_layout.addWidget(self.blank_sublabel, 0, Qt.AlignmentFlag.AlignHCenter)
+        blank_layout.addStretch(1)
+
+    """ Controls (LOGIKA BARU DITAMBAHKAN DI SINI) """
+    def clear_results(self, empty_result: bool = False) -> None:
+        # Mempertahankan logika clear_results Anda
+        if empty_result:
+            self.blank_label.setText("No applicant found")
+            self.blank_sublabel.setText(self.search_statistics.text())
+        else:
+            self.blank_label.setText("Search for applicants to see results here")
+            self.blank_sublabel.setText("Start by entering keywords in the left panel")
+            # Panggil set_results dengan data kosong sesuai format baru
+            self.set_results([], 0, 0)
+        self.stack.setCurrentWidget(self.blank_page)
+    
+    def display_results(self) -> None:
+        # Mempertahankan logika display_results Anda
+        if self.page_count == 0:
+            self.stack.setCurrentWidget(self.blank_page)
+        else:
+            self.stack.setCurrentWidget(self.result_page)
+            # Paginate the results by shifting through the stacked widgets
+            for card_stack in self.result_cards:
+                # Cek jika halaman yang diminta ada
+                if self.current_page - 1 < card_stack.count():
+                    widget = card_stack.widget(self.current_page-1)
+                    card_stack.setCurrentWidget(widget)
+    
+    def set_results(self, results: list[ApplicantMatchData], exact_time: float, fuzzy_time: float, is_fuzzy: bool):
+        self.clear_results(empty_result=True)
         
-        main_results_layout.addLayout(results_row_layout)
+        timing_text = ""
+        if is_fuzzy:
+            self.result_summary.setText("Fuzzy Match Results")
+            timing_text = f"Fuzzy search complete in: {fuzzy_time:.2f}ms"
+        else:
+            self.result_summary.setText("Exact Match Results")
+            timing_text = f"Exact search complete in: {exact_time:.2f}ms"
         
-        # 2c. Label Halaman
-        self.page_label = QLabel("0/0")
-        self.page_label.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #444444;")
-        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_results_layout.addWidget(self.page_label)
+        self.search_statistics.setText(timing_text)
 
-        main_results_layout.addStretch()
-
-        # 3. Layout root yang mengatur mana yang ditampilkan
-        root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.addWidget(self.blank_label)
-        root_layout.addWidget(self.results_widget)
-        
-        self.results_widget.hide()
-
-    def clear_layout(self, layout):
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            else:
-                sub_layout = item.layout()
-                if sub_layout is not None:
-                    self.clear_layout(sub_layout)
-
-    def update_displayed_results(self):
-        self.clear_layout(self.result_card_layout)
-        start_index = self.current_page * self.results_per_page
-        end_index = start_index + self.results_per_page
-        results_to_display = self.all_results[start_index:end_index]
-
-        row, col = 0, 0
-        for data in results_to_display:
-            card = ApplicantCard(data)
-            card.view_summary.connect(self.view_summary)
-            card.view_cv.connect(self.view_cv)
-            self.result_card_layout.addWidget(card, row, col)
-            col = (col + 1) % 2
-            if col == 0:
-                row += 1
-        self.page_label.setText(f"Page {self.current_page + 1}/{self.page_count}")
-
-    def set_results(self, results: list[ApplicantMatchData], exact_time: float, fuzzy_time: float):
         self.all_results = results
-        timing_text = f"Exact Match: found results in {exact_time:.2f}ms."
-        if fuzzy_time > 0:
-            timing_text += f"\nFuzzy Match: ran in {fuzzy_time:.2f}ms."
-        self.timing_label.setText(timing_text)
-        
-        if not results:
-            self.results_widget.hide()
-            self.blank_label.setText("No matching applicants found.")
-            self.blank_label.show()
-            return
-
-        self.blank_label.hide()
-        self.results_widget.show()
-        self.current_page = 0
         self.page_count = math.ceil(len(self.all_results) / self.results_per_page)
-        self.update_displayed_results()
+        self.current_page = 1 if self.page_count > 0 else 0
+        
+        self.page_label.setText(f"{self.current_page} / {self.page_count}")
+
+        for stack in self.result_cards:
+            while stack.count() > 0:
+                widget = stack.widget(0)
+                stack.removeWidget(widget)
+                widget.deleteLater()
+        
+        total_slots = self.page_count * self.results_per_page
+        for i in range(total_slots):
+            card_slot_index = i % self.results_per_page
+            
+            if i < len(self.all_results):
+                applicant_data = self.all_results[i]
+                card = ApplicantCard(applicant_data)
+                card.view_summary.connect(self.view_summary)
+                card.view_cv.connect(self.view_cv)
+                self.result_cards[card_slot_index].addWidget(card)
+            else:
+                blank_space = QWidget()
+                self.result_cards[card_slot_index].addWidget(blank_space)
+        
+        self.display_results()
 
     def on_prev_clicked(self) -> None:
-        if self.current_page > 0:
+        # Mempertahankan logika navigasi Anda
+        if self.current_page > 1:
             self.current_page -= 1
-            self.update_displayed_results()
+            self.display_results()
+            self.page_label.setText(f"{self.current_page} / {self.page_count}")
         
     def on_next_clicked(self) -> None:
-        if self.current_page < self.page_count - 1:
+        # Mempertahankan logika navigasi Anda
+        if self.current_page < self.page_count:
             self.current_page += 1
-            self.update_displayed_results()
+            self.display_results()
+            self.page_label.setText(f"{self.current_page} / {self.page_count}")

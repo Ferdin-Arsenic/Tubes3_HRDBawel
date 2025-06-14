@@ -43,7 +43,7 @@ class ApplicantCard(QWidget):
 
         horizontal_line = QWidget()
         horizontal_line.setFixedHeight(1)
-        horizontal_line.setStyleSheet("background-color: #000000;")
+        horizontal_line.setStyleSheet("background-color: #cccccc;")
         self.container.addWidget(horizontal_line)
 
         buttons_layout = QHBoxLayout()
@@ -67,7 +67,6 @@ class KeywrodsMatchedTable(QTableWidget):
         self.setRowCount(len(data.matched_keywords))
         self.setColumnCount(2)
         self.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #000000; border: none;")
-        # self.setFixedHeight(70)
         self.setFixedWidth(150)
         self.setShowGrid(False)
         self.setContentsMargins(0, 0, 0, 0)
