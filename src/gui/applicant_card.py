@@ -64,12 +64,19 @@ class ApplicantCard(QWidget):
 class KeywrodsMatchedTable(QTableWidget):
     def __init__(self, data: ApplicantMatchData, parent=None):
         super().__init__(parent)
-
-        all_matches = data.matched_keywords.copy()
+        
+        aggregated_keywords: dict[str, int] = {}
+        for keyword, freq in data.matched_keywords.items():
+            aggregated_keywords[keyword] = freq
         if data.fuzzy_matched_keywords:
-            all_matches.update(data.fuzzy_matched_keywords)
-
-        self.setRowCount(len(all_matches))
+            for keyword, freq in data.fuzzy_matched_keywords.items():
+                if keyword in aggregated_keywords:
+                    aggregated_keywords[keyword] += freq
+                else:
+                    aggregated_keywords[keyword] = freq
+        
+        self.setRowCount(len(aggregated_keywords))
+        
         self.setColumnCount(2)
         self.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #000000; border: none;")
         self.setFixedWidth(150)
@@ -86,7 +93,7 @@ class KeywrodsMatchedTable(QTableWidget):
         font_metrics = self.fontMetrics()
         row_height = font_metrics.height()
 
-        for row, (keyword, freq) in enumerate(all_matches.items()):
+        for row, (keyword, freq) in enumerate(aggregated_keywords.items()):
             keyword_item = QTableWidgetItem(keyword)
             keyword_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             freq_item = QTableWidgetItem(str(freq))
