@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget
-from PyQt6.QtGui import QDesktopServices  # Tambahkan import ini
-from PyQt6.QtCore import QUrl              # Tambahkan import ini
+from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import QUrl
 import time
 import os
 import re
@@ -47,7 +47,6 @@ class MainWindow(QMainWindow):
         self.search_page.search_initiate.connect(self.search)
         self.search_page.view_summary.connect(self.summary)
         self.search_page.view_cv.connect(self.view_cv)
-        self.summary_page.back_button_clicked.connect(self.show_search_page)
         print("MainWindow initialization complete")
 
     def show_search_page(self):
@@ -67,11 +66,6 @@ class MainWindow(QMainWindow):
         if not search_params.keywords or not search_params.keywords[0]:
             self.search_page.result_display.clear_results(empty_result=False)
             return
-        if not search_function:
-            print(f"Error: Algorithm {search_params.algorithm} not found.")
-            return
-            
-        print(f"[DEBUG] Using algorithm: {search_params.algorithm.name}")
 
         base_dir = os.path.dirname(os.path.dirname(__file__))
         text_files_dir = os.path.join(base_dir, "dataset", "txt")
@@ -116,10 +110,13 @@ class MainWindow(QMainWindow):
             
             sorted_results = sorted(final_results_map.values(), key=lambda x: x.match_count, reverse=True)
             top_results = sorted_results[:search_params.top_matches]
-            self.search_page.result_display.set_results(top_results, runtime_ms, 0, is_fuzzy=False)
+            self.search_page.result_display.set_results(SearchResult(
+                applicants=top_results,
+                cvs_scanned=len(all_files),
+                runtime=runtime_ms
+            ), is_fuzzy=False)
             return
 
-        print("[DEBUG] No exact matches found. Falling back to fuzzy search.")
         SIMILARITY_THRESHOLD = 80.0
         fuzzy_results_map = {}
 
@@ -162,7 +159,11 @@ class MainWindow(QMainWindow):
         
         sorted_results_fuzzy = sorted(fuzzy_results_map.values(), key=lambda x: x.match_count, reverse=True)
         top_results_fuzzy = sorted_results_fuzzy[:search_params.top_matches]
-        self.search_page.result_display.set_results(top_results_fuzzy, 0, runtime_ms_fuzzy, is_fuzzy=True)
+        self.search_page.result_display.set_results(SearchResult(
+            applicants=top_results_fuzzy,
+            cvs_scanned=len(all_files),
+            runtime=runtime_ms_fuzzy
+        ), is_fuzzy=True)
 
     def view_cv(self, detail_id: str):
         """
@@ -198,47 +199,10 @@ class MainWindow(QMainWindow):
         """
         print(f"Viewing summary for applicant ID: {detail_id}")
         
-        # Get applicant data from the database or file system
+        applicant_data = None
         if self.db:
             applicant_data = self.db.get_applicant_data(detail_id)
-        else:
-            # Fallback to direct file reading if no database
-            applicant_data = self._get_applicant_data_from_file(detail_id)
         
         if applicant_data:
-            # Update the summary page with the new data
-            self.summary_page.set_summary_data(
-                title=f"Ringkasan CV - {applicant_data.get('name', 'N/A')}",
-                summary_text=applicant_data.get('content', 'Konten tidak ditemukan.')
-            )
-            # Switch the stacked widget to show the summary page
-            self.stack.setCurrentWidget(self.summary_page)
-        else:
-            print(f"Error: Could not find data for ID: {detail_id}")
-            # Optionally, show an error on the summary page
-            self.summary_page.set_summary_data(
-                title="Error",
-                summary_text=f"Tidak dapat menemukan data untuk ID: {detail_id}"
-            )
-            self.stack.setCurrentWidget(self.summary_page)
-
-    def _get_applicant_data_from_file(self, detail_id: str) -> dict | None:
-        """Fallback method to read applicant data directly from file"""
-        try:
-            import re
-            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-            txt_path = os.path.join(base_dir, 'dataset', 'txt', f'{detail_id}.txt')
-            
-            with open(txt_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Extract name from content if possible, or use placeholder
-            name_search = re.search(r'([a-zA-Z\s]+)\n', content)
-            name = name_search.group(1).strip().title() if name_search else f"Applicant {detail_id}"
-
-            return {"name": name, "content": content}
-        except FileNotFoundError:
-            return {"name": f"Applicant {detail_id}", "content": "File konten tidak ditemukan."}
-        except Exception as e:
-            print(f"Error reading file for {detail_id}: {e}")
-            return None
+            # TO DO: Implement the logic to extract and display the summary
+            pass

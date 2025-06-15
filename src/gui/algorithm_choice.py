@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QButtonGroup, QRadioButton # Import QVBoxLayout
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QButtonGroup, QRadioButton
 from PyQt6.QtCore import Qt
 from models.search import SearchAlgorithm
 
@@ -15,7 +15,7 @@ class AlgorithmButtons(QWidget):
         self.group = QButtonGroup(self)
         self.group.setExclusive(True)
 
-        self.layout = QVBoxLayout(self)
+        self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(5)
         
@@ -23,7 +23,6 @@ class AlgorithmButtons(QWidget):
             button = PillButton(choice.value, self)
             self.group.addButton(button, id)
             self.layout.addWidget(button) 
-            
             if id == 0:
                 button.setChecked(True)
         
