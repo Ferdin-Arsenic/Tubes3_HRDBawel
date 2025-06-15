@@ -7,4 +7,5 @@ requires-python = ">=3.13"
 dependencies = [
     "pyqt6>=6.9.0",
     "pymupdf>=1.26.1",
+    "faker>=37.4.0",
 ]

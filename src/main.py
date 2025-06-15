@@ -1,7 +1,9 @@
 import sys
 import traceback
+import argparse
 from PyQt6.QtWidgets import QApplication
 from main_window import MainWindow
+from database.cv_database import CVDatabase
 
 def main():
     try:
@@ -38,4 +40,20 @@ def main():
     input("Press Enter to continue...")  # Pause untuk melihat error
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="A tool to analyze and search through CVs.")
+    parser.add_argument("--seed",
+                        nargs='+',
+                        metavar=('PATH', '[ROLE]'),
+                        help="Populate the database with CVs from PATH, filled in with the specified ROLE.")
+
+    args = parser.parse_args()
+    if args.seed:
+        database = CVDatabase()
+        relative_path = args.seed[0].replace("/", "\\")
+        role = args.seed[1] if len(args.seed) > 1 else None
+        if role:
+            database.seed_database(relative_path, role)
+        else:
+            database.seed_database(relative_path)
+    else:
+        main()

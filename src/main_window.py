@@ -4,16 +4,23 @@ from PyQt6.QtCore import QUrl
 import time
 import os
 import re
+from datetime import datetime
 from gui.search_page import SearchPage
 from gui.summary_page import SummaryPage
-from models.search import SearchParams, ApplicantMatchData, SearchResult
-from models.search import SearchAlgorithm 
+from models.search import SearchParams, ApplicantMatchData, ApplicationDetail, SearchResult, SearchAlgorithm, WorkExperienceEntry, EducationEntry, CVSummary
 
 from lib.kmp import KMP
 from lib.bm import BM
 from lib.aho_corasick import aho_corasick
 from lib.levenshtein import levenshtein_distance
-from database.cv_database import CvDatabase
+from database.cv_database import CVDatabase
+from util.parser import pdf_to_string
+
+algorithm_map = {
+    SearchAlgorithm.KMP: KMP,
+    SearchAlgorithm.BM: BM,
+    SearchAlgorithm.AHO_CORASICK: aho_corasick,
+}
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -28,7 +35,7 @@ class MainWindow(QMainWindow):
         # Initialize database with error handling
         try:
             print("Initializing database...")
-            self.db = CvDatabase()
+            self.db = CVDatabase()
             print("Database initialized successfully")
         except Exception as e:
             print(f"Database initialization failed: {e}")
@@ -63,88 +70,78 @@ class MainWindow(QMainWindow):
 
 
     def search(self, search_params: SearchParams):
-        start_time = time.time()
+        search_results = SearchResult(applicants=[], cvs_scanned=0, runtime=0)
+        applications = self.db.get_all_application_details()
 
-        algorithm_map = {
-            SearchAlgorithm.KMP: KMP,
-            SearchAlgorithm.BM: BM,
-            SearchAlgorithm.AHO_CORASICK: aho_corasick,
-        }
-        search_function = algorithm_map.get(search_params.algorithm)
+        # Compute a mapping of detail_id to ApplicantMatchData
+        app_matches = self.exact_search(search_params, search_results, applications)
+
+        each_keyword_found = False
+        for keyword in search_params.keywords:
+            for match in app_matches.values():
+                if keyword in match.matched_keywords:
+                    each_keyword_found = True
+                    break
+
+        if not each_keyword_found or len(search_results.applicants) < search_params.top_matches:
+            # Compute additional matches using fuzzy search
+            self.fuzzy_search(search_params, search_results, applications, app_matches)
+
+        # Aggregate app_matches into SearchResult
+        for detail_id, match_data in app_matches.items():
+            profile = self.db.get_applicant_profile(detail_id)
+            if profile:
+                match_data.name = f"{profile.first_name} {profile.last_name}"
+                search_results.applicants.append(match_data)
+
+        # Sort the results by match count in descending order
+        search_results.applicants.sort(key=lambda x: x.match_count, reverse=True)
+        self.search_page.show_results(search_results)
+
+    def exact_search(self, search_params: SearchParams, search_results: SearchResult, applications: list[ApplicationDetail]) -> dict[int, ApplicantMatchData]:
+        print(f"Performing exact search with parameters: {search_params}")
         
-        if not search_params.keywords or not search_params.keywords[0]:
-            self.search_page.result_display.clear_results(empty_result=False)
-            return
+        search_function = algorithm_map.get(search_params.algorithm)
 
-        base_dir = os.path.dirname(os.path.dirname(__file__))
-        text_files_dir = os.path.join(base_dir, "dataset", "txt")
-        if not os.path.isdir(text_files_dir):
-            print(f"Error: Directory not found at {text_files_dir}")
-            return
-            
-        all_files = [f for f in os.listdir(text_files_dir) if f.endswith(".txt")]
-        final_results_map = {}
-
-        for filename in all_files:
-            applicant_id = os.path.splitext(filename)[0]
-            file_path = os.path.join(text_files_dir, filename)
-
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read().lower()
-            except (IOError, FileNotFoundError):
-                continue
-
-            exact_matches = {}
+        final_results: dict[int, ApplicantMatchData] = {}
+        start_time = time.time()
+        for app in applications:
+            cv_text = pdf_to_string(app.cv_path).lower() if app.cv_path else ""
+            exact_matches: dict[str, int] = {}
             for keyword in search_params.keywords:
                 keyword_lower = keyword.strip().lower()
                 if not keyword_lower: continue
 
-                occurrences = search_function(content, keyword_lower)
+                occurrences = search_function(cv_text, keyword_lower)
                 if occurrences:
                     exact_matches[keyword] = len(occurrences)
             
             if exact_matches:
-                final_results_map[applicant_id] = ApplicantMatchData(
-                    detail_id=int(applicant_id),
-                    name=f"Applicant {applicant_id}",
-                    match_count=sum(exact_matches.values()),
+                final_results[app.detail_id] = ApplicantMatchData(
+                    detail_id=app.detail_id,
+                    name="",  # Filled later
+                    match_count = sum(exact_matches.values()),
                     matched_keywords=exact_matches,
                 )
+        end_time = time.time()
+        
+        search_results.cvs_scanned = len(applications)
+        search_results.runtime = (end_time - start_time) * 1000
+        return final_results
 
-        if final_results_map:
-            end_time = time.time()
-            runtime_ms = (end_time - start_time) * 1000
-            print(f"Search complete in {runtime_ms:.2f} ms. Found {len(final_results_map)} matching applicants (Exact).")
-            
-            sorted_results = sorted(final_results_map.values(), key=lambda x: x.match_count, reverse=True)
-            top_results = sorted_results[:search_params.top_matches]
-            self.search_page.result_display.set_results(SearchResult(
-                applicants=top_results,
-                cvs_scanned=len(all_files),
-                runtime=runtime_ms
-            ), is_fuzzy=False)
-            return
-
+    def fuzzy_search(self, search_params: SearchParams, search_results: SearchResult, applications: list[ApplicationDetail], previous_matches: dict[int, ApplicantMatchData]) -> None:
+        print(f"Performing fuzzy search with parameters: {search_params}")
         SIMILARITY_THRESHOLD = 80.0
-        fuzzy_results_map = {}
 
-        for filename in all_files:
-            applicant_id = os.path.splitext(filename)[0]
-            file_path = os.path.join(text_files_dir, filename)
-
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read().lower()
-                    words_in_cv = set(re.findall(r'[a-z]+', content))
-            except (IOError, FileNotFoundError):
-                continue
-            
-            fuzzy_matches = {}
+        start_time = time.time()
+        for app in applications:
+            cv_text = pdf_to_string(app.cv_path).lower() if app.cv_path else ""
+            fuzzy_matches: dict[str, int] = {}
             for keyword in search_params.keywords:
                 keyword_lower = keyword.strip().lower()
                 if not keyword_lower: continue
                 
+                words_in_cv = set(re.findall(r'[a-z]+', cv_text))
                 for word_in_cv in words_in_cv:
                     len_max = max(len(keyword_lower), len(word_in_cv))
                     if len_max > 0:
@@ -153,26 +150,26 @@ class MainWindow(QMainWindow):
                         if SIMILARITY_THRESHOLD <= similarity < 100:
                             fuzzy_key = f"{word_in_cv} (~)"
                             fuzzy_matches[fuzzy_key] = fuzzy_matches.get(fuzzy_key, 0) + 1
-
+            
             if fuzzy_matches:
-                fuzzy_results_map[applicant_id] = ApplicantMatchData(
-                    detail_id=int(applicant_id),
-                    name=f"Applicant {applicant_id}",
-                    match_count=sum(fuzzy_matches.values()),
-                    matched_keywords=fuzzy_matches,
-                )
-        
-        end_time_fuzzy = time.time()
-        runtime_ms_fuzzy = (end_time_fuzzy - start_time) * 1000
-        print(f"Search complete in {runtime_ms_fuzzy:.2f} ms. Found {len(fuzzy_results_map)} matching applicants (Fuzzy).")
-        
-        sorted_results_fuzzy = sorted(fuzzy_results_map.values(), key=lambda x: x.match_count, reverse=True)
-        top_results_fuzzy = sorted_results_fuzzy[:search_params.top_matches]
-        self.search_page.result_display.set_results(SearchResult(
-            applicants=top_results_fuzzy,
-            cvs_scanned=len(all_files),
-            runtime=runtime_ms_fuzzy
-        ), is_fuzzy=True)
+                detail_id = app.detail_id
+                if detail_id in previous_matches:
+                    match_data = previous_matches[detail_id]
+                    match_data.match_count += sum(fuzzy_matches.values())
+                    match_data.fuzzy_matched_keywords = fuzzy_matches
+                else:
+                    match_data = ApplicantMatchData(
+                        detail_id=detail_id,
+                        name="",  # Filled later
+                        match_count=sum(fuzzy_matches.values()),
+                        matched_keywords={},
+                        fuzzy_matched_keywords=fuzzy_matches
+                    )
+                    previous_matches[detail_id] = match_data
+        end_time = time.time()
+
+        search_results.cvs_scanned = len(applications)
+        search_results.fuzzy_runtime = (end_time - start_time) * 1000
 
     def view_cv(self, detail_id: str):
         """
@@ -202,39 +199,49 @@ class MainWindow(QMainWindow):
             print(f"Error: Could not find a CV path for ID: {detail_id}")
 
     def summary(self, detail_id: id):
+        app_detail = self.db.get_application_detail(detail_id)
+        app_profile = self.db.get_applicant_profile(app_detail.applicant_id)
+        cv_summary = CVSummary(
+            name = app_profile.first_name + " " + app_profile.last_name,
+            birthdate = app_profile.date_of_birth,
+            address = app_profile.address,
+            contacts = [app_profile.phone_number],
+            description = "",
+            skills = [],
+            education = [],
+            work_experience = []
+        )
+
         # TO DO: Dummy page. INTEGRATE NEXT
-        from models.search import WorkExperienceEntry, EducationEntry, CVSummary
-        from datetime import datetime
-        self.summary_page.set_summary(1, CVSummary(
-            name="John Doe",
-            birthdate= datetime(1990, 1, 1),
-            address="123 Main St, City",
-            contacts=["+6281234567890", "absc.xyz"],
-            description="A brief summary of the applicant's qualifications and experience.",
-            skills=["Python", "Java", "C++", "Machine Learning", "Data Analysis"],
-            education=[EducationEntry(
+        # Dummy data for testing
+        cv_summary.description = "A brief summary of the applicant's qualifications and experience."
+        cv_summary.skills = ["Python", "Java", "C++", "Machine Learning", "Data Analysis"]
+        cv_summary.education = [
+            EducationEntry(
                 institution="University XYZ",
                 program="Bachelor of Science in Computer Science",
                 start_date="2010-01",
                 end_date="2014-01"
-            )],
-            work_experience=[
-                WorkExperienceEntry(
-                    company="Company ABC",
-                    position="Software Engineer",
-                    start_date="2015-01",
-                    end_date="2020-01",
-                    description="Developed and maintained software applications using Python and Java."
-                ),
-                WorkExperienceEntry(
-                    company="Company XYZ",
-                    position="Senior Developer",
-                    description="",
-                    start_date="2020-01",
-                    end_date="2023-01"
-                )
-            ]
-        ))
+            )
+        ]
+        cv_summary.work_experience = [
+            WorkExperienceEntry(
+                position="Software Engineer",
+                company="Company ABC",
+                start_date="2015-01",
+                end_date="2020-01",
+                description="Developed and maintained software applications using Python and Java."
+            ),
+            WorkExperienceEntry(
+                position="Senior Developer",
+                company="",
+                description="",
+                start_date="2020-01",
+                end_date=""
+            )
+        ]
+
+        self.summary_page.set_summary(detail_id, cv_summary)
         self.stack.setCurrentWidget(self.summary_page)
         # Extracted CV summary
 

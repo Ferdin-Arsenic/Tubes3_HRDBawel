@@ -1,6 +1,14 @@
 import fitz  # PyMuPDF
 import os
 
+def pdf_to_string(pdf_path):
+    doc = fitz.open(pdf_path)
+    all_text = []
+    for page in doc:
+        text = page.get_text().replace("\n", " ").replace("\r", " ").lower()
+        all_text.append(text)
+    return " ".join(all_text)
+
 def pdf_to_text(pdf_path, txt_output_path):
     doc = fitz.open(pdf_path)
     all_text = ""
@@ -23,4 +31,4 @@ def extract_all_pdfs(input_dir, output_dir):
 
 # Contoh penggunaan
 # pdf_to_text("../../dataset/pdf/[INPUT].pdf", "../../dataset/pdf/[OUTPUT].pdf")
-extract_all_pdfs("../../dataset/pdf/", "../../dataset/txt/")
+# extract_all_pdfs("../../dataset/pdf/", "../../dataset/txt/")
