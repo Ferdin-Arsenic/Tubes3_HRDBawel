@@ -19,11 +19,10 @@ class AlgorithmButtons(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(5)
         
-        
         for id, choice in enumerate(SearchAlgorithm):
             button = PillButton(choice.value, self)
             self.group.addButton(button, id)
-            self.layout.addWidget(button)
+            self.layout.addWidget(button) 
             if id == 0:
                 button.setChecked(True)
         

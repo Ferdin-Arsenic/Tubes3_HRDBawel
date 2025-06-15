@@ -121,7 +121,7 @@ class ResultDisplay(QWidget):
                 card_stack.setCurrentWidget(widget)
             self.stack.setCurrentWidget(self.result_page)
 
-    def set_results(self, results: SearchResult) -> None:
+    def set_results(self, results: SearchResult, is_fuzzy=False) -> None:
         self.page_count = (len(results.applicants) + self.results_per_page - 1) // self.results_per_page
         self.current_page = 1 if self.page_count > 0 else 0
         
