@@ -30,13 +30,6 @@ CREATE_APPLICATION_DETAIL = '''
     );
 '''
 
-MATCH_APPLICANT_ID = '''
-    SELECT applicant_id FROM ApplicantProfile
-    WHERE first_name = %s AND last_name = %s AND date_of_birth = %s
-    AND address = %s AND phone_number = %s
-    LIMIT 1;
-'''
-
 INSERT_NEW_APPLICANT_PROFILE = '''
     INSERT INTO ApplicantProfile (first_name, last_name, date_of_birth, address, phone_number)
     VALUES (%s, %s, %s, %s, %s);
@@ -51,8 +44,8 @@ SELECT_CV_PATH = '''
     SELECT cv_path FROM ApplicationDetail WHERE detail_id = %s;
 '''
 
-SELECT_ALL_CV_PATH = '''
-    SELECT cv_path FROM ApplicationDetail;
+SELECT_ALL_APPLICATION_DETAIL = '''
+    SELECT * FROM ApplicationDetail;
 '''
 
 SELECT_APPLICATION_DETAIL = '''
@@ -128,6 +121,8 @@ class CVDatabase:
             return False
 
     def init_database(self):
+        Faker.seed(42)  # For reproducibility
+
         cursor = self.connection.cursor()
         cursor.execute(f"CREATE DATABASE {self.db_name};")
         cursor.execute(f"USE {self.db_name};")
@@ -157,28 +152,17 @@ class CVDatabase:
         data_cursor.close()
                 
     def seed_database(self, relative_data_directory, role=""):
+        import random
+        random.seed(42) # For reproducibility
         if role == "":
             role = "Unknown"
         cursor = self.connection.cursor()
-        for file in os.listdir(relative_data_directory):
+        applicant_ids = self.get_all_applicant_profiles_id()
+        for file in os.listdir(os.path.join(relative_data_directory)):
             if file.endswith('.pdf'):
                 cv_path = os.path.join(relative_data_directory, file)
-                cv_data: CVPersonalData | None = None       # TO DO: Implement extractor
-                # cv_data = CVExtractor.extract_data(cv_path)
-                if cv_data is None:
-                    continue
-
-                # Check if personal data already exists, if not insert it
-                cursor.execute(MATCH_APPLICANT_ID, (cv_data.first_name, cv_data.last_name, cv_data.date_of_birth))
-                applicant_id = cursor.fetchone()
-                if applicant_id is None:
-                    cursor.execute(INSERT_NEW_APPLICANT_PROFILE, (
-                        cv_data.first_name, cv_data.last_name, cv_data.date_of_birth,
-                        cv_data.address, cv_data.phone_number
-                    ))
-                    applicant_id = cursor.lastrowid
-                
-                # Insert application detail
+                applicant_id = random.choice(applicant_ids)                
+                print(f"Seeding application detail for file: {file} with applicant_id: {applicant_id} and role: {role}")
                 cursor.execute(INSERT_NEW_APPLICATION_DETAIL, (applicant_id, role, cv_path))
         self.connection.commit()
         cursor.close()
@@ -249,59 +233,77 @@ class CVDatabase:
         if not self.connection:
             print("Database connection is not established.")
             return None
-        with self.connection.cursor() as cursor:
-            cursor = self.connection.cursor()
-            cursor.execute(SELECT_CV_PATH, (detail_id,))
-            result = cursor.fetchone()
-            return result[0] if result else None
+        cursor = self.connection.cursor()
+        cursor = self.connection.cursor()
+        cursor.execute(SELECT_CV_PATH, (detail_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
 
-    def get_all_cv_path(self) -> list[str] | None:
+    def get_all_application_details(self) -> list[ApplicationDetail]:
         if not self.connection:
             print("Database connection is not established.")
-            return None
-        with self.connection.cursor() as cursor:
-            cursor.execute(SELECT_ALL_CV_PATH)
-            results = cursor.fetchall()
-            return [row[0] for row in results if row[0] is not None]
+            return []
+        cursor = self.connection.cursor()
+        cursor.execute(SELECT_ALL_APPLICATION_DETAIL)
+        results = cursor.fetchall()
+        application_details = []
+        for row in results:
+            application_details.append(ApplicationDetail(
+                detail_id=row[0],
+                applicant_id=row[1],
+                application_role=row[2],
+                cv_path=row[3]
+            ))
+        return application_details
 
     def get_application_detail(self, detail_id: int) -> ApplicationDetail | None:
         if not self.connection:
             print("Database connection is not established.")
             return None
-        with self.connection.cursor() as cursor:
-            cursor.execute(SELECT_APPLICATION_DETAIL, (detail_id,))
-            result = cursor.fetchone()
-            if result:
-                return ApplicationDetail(
-                    detail_id=result[0],
-                    applicant_id=result[1],
-                    application_role=result[2],
-                    cv_path=result[3]
-                )
-            return None
+        cursor = self.connection.cursor()
+        cursor.execute(SELECT_APPLICATION_DETAIL, (detail_id,))
+        result = cursor.fetchone()
+        if result:
+            return ApplicationDetail(
+                detail_id=result[0],
+                applicant_id=result[1],
+                application_role=result[2],
+                cv_path=result[3]
+            )
+        return None
 
     def get_applicant_profile(self, applicant_id: int) -> ApplicantProfile | None:
         if not self.connection:
             print("Database connection is not established.")
             return None
-        with self.connection.cursor() as cursor:
-            cursor.execute(SELECT_APPLICANT_PROFILE, (applicant_id,))
-            result = cursor.fetchone()
-            if result:
-                return ApplicantProfile(
-                    applicant_id=result[0],
-                    first_name=result[1],
-                    last_name=result[2],
-                    date_of_birth=result[3],
-                    address=result[4],
-                    phone_number=result[5]
-                )
-            return None
+        cursor = self.connection.cursor()
+        cursor.execute(SELECT_APPLICANT_PROFILE, (applicant_id,))
+        result = cursor.fetchone()
+        if result:
+            return ApplicantProfile(
+                applicant_id=result[0],
+                first_name=result[1],
+                last_name=result[2],
+                date_of_birth=result[3],
+                address=result[4],
+                phone_number=result[5]
+            )
+        return None
+    
+    def get_all_applicant_profiles_id(self) -> list[int]:
+        if not self.connection:
+            print("Database connection is not established.")
+            return []
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT applicant_id FROM ApplicantProfile")
+        results = cursor.fetchall()
+        cursor.close()
+        return [row[0] for row in results if row[0] is not None]
         
 
 if __name__ == "__main__":
     print("=== MySQL Connection Test ===")
-    db = CvDatabase()
+    db = CVDatabase()
     if db.connection:
         print("Database connection established successfully.")
         db.close()
