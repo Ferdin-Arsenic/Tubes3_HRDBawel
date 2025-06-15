@@ -66,21 +66,11 @@ class MainWindow(QMainWindow):
         search_results = SearchResult(applicants=[], cvs_scanned=0, runtime=0)
         applications = self.db.get_all_application_details()
 
-        # Compute a mapping of detail_id to ApplicantMatchData
         app_matches = self.exact_search(search_params, search_results, applications)
 
-        each_keyword_found = False
-        for keyword in search_params.keywords:
-            for match in app_matches.values():
-                if keyword in match.matched_keywords:
-                    each_keyword_found = True
-                    break
-
-        if not each_keyword_found or len(search_results.applicants) < search_params.top_matches:
-            # Compute additional matches using fuzzy search
+        if not app_matches:
             self.fuzzy_search(search_params, search_results, applications, app_matches)
 
-        # Aggregate app_matches into SearchResult
         for detail_id, match_data in app_matches.items():
             applicant_id = -1
             for app in applications:
@@ -92,8 +82,11 @@ class MainWindow(QMainWindow):
                 match_data.name = f"{profile.first_name} {profile.last_name}"
                 search_results.applicants.append(match_data)
 
-        # Sort the results by match count in descending order
         search_results.applicants.sort(key=lambda x: x.match_count, reverse=True)
+
+        if search_params.top_matches > 0:
+            search_results.applicants = search_results.applicants[:search_params.top_matches]
+
         self.search_page.show_results(search_results)
 
     def exact_search(self, search_params: SearchParams, search_results: SearchResult, applications: list[ApplicationDetail]) -> dict[int, ApplicantMatchData]:

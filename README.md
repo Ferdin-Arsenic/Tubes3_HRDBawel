@@ -15,7 +15,7 @@ Dapat dijalankan menggunakan package manager uv. Program memiliki dependensi ber
 - PyMySQL (library koneksi basis data)
 
 # Instructions
-  Lakukan penambahan file pdf CV terlebih dahulu dengan seeding:
+  Pastikan server MySQL telah berjalan. Lakukan penambahan file pdf CV terlebih dahulu dengan seeding:
   ```
   uv run src/main.py --seed PATH [ROLE]
   ```

@@ -76,6 +76,7 @@ class KeywrodsMatchedTable(QTableWidget):
                     aggregated_keywords[keyword] = freq
         
         self.setRowCount(len(aggregated_keywords))
+        
         self.setColumnCount(2)
         self.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #000000; border: none;")
         self.setFixedWidth(150)
