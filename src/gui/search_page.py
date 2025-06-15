@@ -3,6 +3,7 @@ from PyQt6.QtCore import pyqtSignal
 from gui.input import InputFields
 from gui.result import ResultDisplay
 from models.search import SearchParams
+from database.cv_database import CvDatabase
 
 class SearchPage(QWidget):
     search_initiate = pyqtSignal(SearchParams)  # Signal to initiate search with parameters
@@ -40,14 +41,12 @@ class SearchPage(QWidget):
         root_layout.addWidget(right_panel)
 
 
-        # Input fields in the left panel
         self.input_fields = InputFields(left_panel)
-        self.input_fields.search_initiate.connect(self.search_initiate)
+        self.result_display = ResultDisplay(right_panel) 
 
-        # Result display in the right panel
-        self.result_display = ResultDisplay(right_panel)
-        self.result_display.view_summary.connect(self.view_summary)
-        self.result_display.view_cv.connect(self.view_cv)
+        self.input_fields.search_initiate.connect(self.search_initiate)
+        self.result_display.view_summary.connect(self.view_summary.emit) 
+        self.result_display.view_cv.connect(self.view_cv.emit)
 
         left_layout.addWidget(self.input_fields)
         right_layout.addWidget(self.result_display)

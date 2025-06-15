@@ -1,4 +1,6 @@
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget
+from PyQt6.QtGui import QDesktopServices  # Tambahkan import ini
+from PyQt6.QtCore import QUrl              # Tambahkan import ini
 import time
 import os
 import re
@@ -7,11 +9,11 @@ from gui.summary_page import SummaryPage
 from models.search import SearchParams, ApplicantMatchData, SearchResult
 from models.search import SearchAlgorithm 
 
-#from database.cv_database import DBConnection 
 from lib.kmp import KMP
 from lib.bm import BM
 from lib.aho_corasick import aho_corasick
 from lib.levenshtein import levenshtein_distance
+from database.cv_database import CvDatabase
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -23,14 +25,34 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
 
+        # Initialize database with error handling
+        try:
+            print("Initializing database...")
+            self.db = CvDatabase()
+            print("Database initialized successfully")
+        except Exception as e:
+            print(f"Database initialization failed: {e}")
+            self.db = None
+
+        print("Creating search page...")
         self.search_page = SearchPage()
+        print("Creating summary page...")
         self.summary_page = SummaryPage()
+        
         self.stack.addWidget(self.search_page)
         self.stack.addWidget(self.summary_page)
 
+        # Connect signals
+        print("Connecting signals...")
         self.search_page.search_initiate.connect(self.search)
         self.search_page.view_summary.connect(self.summary)
         self.search_page.view_cv.connect(self.view_cv)
+        self.summary_page.back_button_clicked.connect(self.show_search_page)
+        print("MainWindow initialization complete")
+
+    def show_search_page(self):
+        """Method untuk kembali ke halaman search"""
+        self.stack.setCurrentWidget(self.search_page)
 
     def search(self, search_params: SearchParams):
         start_time = time.time()
@@ -142,10 +164,81 @@ class MainWindow(QMainWindow):
         top_results_fuzzy = sorted_results_fuzzy[:search_params.top_matches]
         self.search_page.result_display.set_results(top_results_fuzzy, 0, runtime_ms_fuzzy, is_fuzzy=True)
 
-    def view_cv(self, detail_id: id):
-        print(f"Viewing CV for applicant ID: {detail_id}")
-        # Show CV pdf
+    def view_cv(self, detail_id: str):
+        """
+        Finds the PDF file path from the database using the detail_id
+        and opens it with the default system PDF viewer.
+        """
+        print(f"Attempting to view CV for applicant ID: {detail_id}")
+        
+        # Get the relative path of the PDF from the database
+        pdf_relative_path = self.db.get_cv_path(detail_id)
 
-    def summary(self, detail_id: id):
+        if pdf_relative_path:
+            # Construct the absolute path. This assumes the script is run from the project root.
+            # A more robust way might be needed if the execution path changes.
+            base_dir = os.path.abspath(os.path.dirname(__file__) + "/..")
+            pdf_full_path = os.path.join(base_dir, pdf_relative_path)
+            
+            print(f"Found PDF at: {pdf_full_path}")
+
+            if os.path.exists(pdf_full_path):
+                # Open the PDF file using the system's default application
+                url = QUrl.fromLocalFile(pdf_full_path)
+                QDesktopServices.openUrl(url)
+            else:
+                print(f"Error: PDF file not found at path: {pdf_full_path}")
+        else:
+            print(f"Error: Could not find a CV path for ID: {detail_id}")
+
+    def summary(self, detail_id: str):
+        """
+        Retrieves the summary (full text content) for the given detail_id,
+        updates the summary page, and switches the view.
+        """
         print(f"Viewing summary for applicant ID: {detail_id}")
-        # Extracted CV summary
+        
+        # Get applicant data from the database or file system
+        if self.db:
+            applicant_data = self.db.get_applicant_data(detail_id)
+        else:
+            # Fallback to direct file reading if no database
+            applicant_data = self._get_applicant_data_from_file(detail_id)
+        
+        if applicant_data:
+            # Update the summary page with the new data
+            self.summary_page.set_summary_data(
+                title=f"Ringkasan CV - {applicant_data.get('name', 'N/A')}",
+                summary_text=applicant_data.get('content', 'Konten tidak ditemukan.')
+            )
+            # Switch the stacked widget to show the summary page
+            self.stack.setCurrentWidget(self.summary_page)
+        else:
+            print(f"Error: Could not find data for ID: {detail_id}")
+            # Optionally, show an error on the summary page
+            self.summary_page.set_summary_data(
+                title="Error",
+                summary_text=f"Tidak dapat menemukan data untuk ID: {detail_id}"
+            )
+            self.stack.setCurrentWidget(self.summary_page)
+
+    def _get_applicant_data_from_file(self, detail_id: str) -> dict | None:
+        """Fallback method to read applicant data directly from file"""
+        try:
+            import re
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            txt_path = os.path.join(base_dir, 'dataset', 'txt', f'{detail_id}.txt')
+            
+            with open(txt_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Extract name from content if possible, or use placeholder
+            name_search = re.search(r'([a-zA-Z\s]+)\n', content)
+            name = name_search.group(1).strip().title() if name_search else f"Applicant {detail_id}"
+
+            return {"name": name, "content": content}
+        except FileNotFoundError:
+            return {"name": f"Applicant {detail_id}", "content": "File konten tidak ditemukan."}
+        except Exception as e:
+            print(f"Error reading file for {detail_id}: {e}")
+            return None
