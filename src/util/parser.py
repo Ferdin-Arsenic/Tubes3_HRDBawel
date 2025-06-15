@@ -31,4 +31,4 @@ def extract_all_pdfs(input_dir, output_dir):
 
 # Contoh penggunaan
 # pdf_to_text("../../dataset/pdf/[INPUT].pdf", "../../dataset/pdf/[OUTPUT].pdf")
-extract_all_pdfs("../../dataset/pdf/", "../../dataset/txt/")
+# extract_all_pdfs("../../dataset/pdf/", "../../dataset/txt/")

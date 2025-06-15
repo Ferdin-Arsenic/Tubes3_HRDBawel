@@ -3,20 +3,24 @@ import re
 import socket
 import threading
 import time
+from faker import Faker
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from models.search import CVPersonalData, ApplicantProfile, ApplicationDetail
 
 """ SQL Queries """
 
-CREATE_TABLES = '''
+CREATE_APPLICANT_PROFILE = '''
     CREATE TABLE IF NOT EXISTS ApplicantProfile (
         applicant_id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
         first_name VARCHAR(50) DEFAULT NULL,
         last_name VARCHAR(50) DEFAULT NULL,
-        date_of_birth date DEFAULT NULL,
+        date_of_birth DATE DEFAULT NULL,
         address VARCHAR(255) DEFAULT NULL,
         phone_number VARCHAR(20) DEFAULT NULL
     );
+'''
+
+CREATE_APPLICATION_DETAIL = '''
     CREATE TABLE IF NOT EXISTS ApplicationDetail (
         detail_id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
         applicant_id INT NOT NULL,
@@ -89,22 +93,27 @@ class CVDatabase:
             if self.connection is None:
                 print("Failed to establish database connection")
                 return
-                
+            
             cursor = self.connection.cursor()
             cursor.execute("SHOW DATABASES LIKE %s", (self.db_name,))
             result = cursor.fetchone()
+            cursor.close()
             if result is None:
                 print(f"Database {self.db_name} does not exist. Initializing...")
-                self.init_database(cursor)
+                self.init_database()
+            else:
+                cursor = self.connection.cursor()
+                cursor.execute(f"USE {self.db_name}")
             
-            cursor.execute(f"USE {self.db_name}")
             print(f"Database '{self.db_name}' ready.")
-            cursor.close()
             
         except Exception as err:
             print(f"Database initialization error: {err}")
             print("Continuing in file-based mode...")
             self.connection = None
+        finally:
+            if cursor:
+                cursor.close()
 
     def _is_mysql_running(self):
         """Check if MySQL server is running on localhost:3306"""
@@ -118,15 +127,35 @@ class CVDatabase:
             print(f"Error checking MySQL port: {e}")
             return False
 
-    def init_database(self, cursor):
-        cursor.execute(f"CREATE DATABASE {self.db_name}")
-        cursor.execute(f"USE {self.db_name}")
-
-        cursor.execute(CREATE_TABLES)
-        
-        cursor.commit()
+    def init_database(self):
+        cursor = self.connection.cursor()
+        cursor.execute(f"CREATE DATABASE {self.db_name};")
+        cursor.execute(f"USE {self.db_name};")
+        cursor.execute(CREATE_APPLICANT_PROFILE)
+        cursor.execute(CREATE_APPLICATION_DETAIL)
+        self.connection.commit()
         cursor.close()
-    
+
+        data_cursor = self.connection.cursor()
+        faker = Faker('id_ID')
+        # Insert dummy data ApplocantProfile
+        for _ in range(20):
+
+            first_name = faker.first_name()
+            last_name = faker.last_name()
+            date_of_birth = faker.date_of_birth(minimum_age=18, maximum_age=60)
+            address = faker.address().replace('\n', ', ')
+            phone_number = faker.phone_number()
+
+            data_cursor.execute(INSERT_NEW_APPLICANT_PROFILE,
+                (first_name, last_name, date_of_birth, address, phone_number)
+            )
+            status = data_cursor.rowcount
+            if status > 0:
+                print(f"Inserted dummy applicant: {first_name} {last_name}, DOB: {date_of_birth}, Address: {address}, Phone: {phone_number}")
+        self.connection.commit()
+        data_cursor.close()
+                
     def seed_database(self, relative_data_directory, role=""):
         if role == "":
             role = "Unknown"
@@ -151,7 +180,7 @@ class CVDatabase:
                 
                 # Insert application detail
                 cursor.execute(INSERT_NEW_APPLICATION_DETAIL, (applicant_id, role, cv_path))
-        cursor.commit()
+        self.connection.commit()
         cursor.close()
 
     def _connect_with_timeout(self):
