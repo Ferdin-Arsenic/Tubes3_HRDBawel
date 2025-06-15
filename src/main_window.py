@@ -81,7 +81,12 @@ class MainWindow(QMainWindow):
 
         # Aggregate app_matches into SearchResult
         for detail_id, match_data in app_matches.items():
-            profile = self.db.get_applicant_profile(detail_id)
+            applicant_id = -1
+            for app in applications:
+                if app.detail_id == detail_id:
+                    applicant_id = app.applicant_id
+                    break
+            profile = self.db.get_applicant_profile(applicant_id)
             if profile:
                 match_data.name = f"{profile.first_name} {profile.last_name}"
                 search_results.applicants.append(match_data)
