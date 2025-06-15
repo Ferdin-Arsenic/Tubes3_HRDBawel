@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
                         distance = levenshtein_distance(keyword_lower, word_in_cv)
                         similarity = (1 - (distance / len_max)) * 100
                         if SIMILARITY_THRESHOLD <= similarity < 100:
-                            fuzzy_key = f"{word_in_cv} (~)"
+                            fuzzy_key = f"{keyword}"
                             fuzzy_matches[fuzzy_key] = fuzzy_matches.get(fuzzy_key, 0) + 1
             
             if fuzzy_matches:
