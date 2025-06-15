@@ -1,6 +1,4 @@
-# File: src/lib/bm.py
-
-def last_occurance(pattern):
+def last_occurance(pattern: str) -> dict:
     """
     Membuat tabel 'bad character (last_occurance)' menggunakan dictionary untuk mendukung semua karakter (Unicode).
     """
@@ -10,16 +8,17 @@ def last_occurance(pattern):
         last_char_table[pattern[i]] = i
     return last_char_table
 
-def BM(text, pattern):
+def BM(text: str, pattern: str) -> list[int]:
     """
     Fungsi pencarian string dengan algoritma Boyer-Moore yang sudah diperbaiki
-    untuk menangani semua jenis karakter (Unicode).
+    untuk menangani semua jenis karakter (Unicode) dan mengembalikan semua indeks kemunculan.
     """
     n = len(text)
     m = len(pattern)
+    matches = []
 
     if m == 0 or n == 0 or m > n:
-        return False
+        return matches
 
     bad_char_table = last_occurance(pattern)
     shift = 0
@@ -31,16 +30,20 @@ def BM(text, pattern):
             j -= 1
 
         if j < 0:
-            return True
+            matches.append(shift)
+            if shift + m < n:
+                shift += m - bad_char_table.get(text[shift + m], -1)
+            else:
+                shift += 1
         
         else:
+            # Pattern tidak cocok, lakukan pergeseran berdasarkan 'bad character rule'
             current_char_in_text = text[shift + j]
-            
             last_occurrence = bad_char_table.get(current_char_in_text, -1)
-            
             shift += max(1, j - last_occurrence)
             
-    return False 
+    return matches
+
 if __name__ == "__main__":
     text = "BILAKATADARIKATAMANAKATAKATA"
     pattern = "KATA"
@@ -52,7 +55,6 @@ if __name__ == "__main__":
     matches2 = BM(text2, pattern2)
     print(f"Pattern '{pattern2}' found in '{text2}' at indices: {matches2}")
 
-    # Contoh yang menyoroti kekuatan Boyer-Moore (lompatan besar)
     text3 = "TRUSTHARDTOOTHBRUSHES"
     pattern3 = "TOOTH"
     matches3 = BM(text3, pattern3)
