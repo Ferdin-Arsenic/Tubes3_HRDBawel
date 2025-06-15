@@ -34,6 +34,8 @@ class InputFields(QWidget):
         self.keywords_input = QTextEdit()
         self.keywords_input.setPlaceholderText("Enter keywords separated by commas")
         self.keywords_input.setStyleSheet(normal_text_style + "background-color: #ffffff; border: 1px solid #ccc; border-radius: 5px; padding: 5px; font-weight: normal;")
+        self.keywords_input.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.keywords_input.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         font_metrics = self.keywords_input.fontMetrics()
         vertical_padding = 20
         self.keywords_input.setMaximumHeight(vertical_padding + font_metrics.lineSpacing() * 2)  # Limit to 2 lines
@@ -95,7 +97,7 @@ class InputFields(QWidget):
 
     def get_input(self) -> SearchParams:
         return SearchParams(
-            self.keywords_input.toPlainText().strip().split(","),
+            [k.strip() for k in self.keywords_input.toPlainText().strip().split(",")],
             self.algorithm_choice.get_selected_algorithm(),
             self.top_matches_input.value()
         )

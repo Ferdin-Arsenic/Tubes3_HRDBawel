@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QGridLayout, QSpacerItem,QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import pyqtSignal, Qt
 from gui.applicant_card import ApplicantCard
-from models.search import ApplicantMatchData, SearchResult
+from models.search import SearchResult
 
 class ResultDisplay(QWidget):
     view_summary = pyqtSignal(int)  # Signal to view summary
@@ -121,13 +121,17 @@ class ResultDisplay(QWidget):
                 card_stack.setCurrentWidget(widget)
             self.stack.setCurrentWidget(self.result_page)
 
-    def set_results(self, results: SearchResult, is_fuzzy=False) -> None:
+    def set_results(self, results: SearchResult) -> None:
         self.page_count = (len(results.applicants) + self.results_per_page - 1) // self.results_per_page
         self.current_page = 1 if self.page_count > 0 else 0
         
         self.page_label.setText(f"{self.current_page} / {self.page_count}")
         self.result_summary.setText(f"{len(results.applicants)} applicants found")
-        self.search_statistics.setText(f"searched {results.cvs_scanned} CVs under {results.runtime}ms")
+        if results.fuzzy_runtime > 0:
+            self.search_statistics.setText(f"searched {results.cvs_scanned} CVs under {results.runtime:.0f}ms, with fuzzy search under {results.fuzzy_runtime:.0f}ms")
+        else:
+            self.search_statistics.setText(f"searched {results.cvs_scanned} CVs under {results.runtime:.0f}ms")
+        print(self.search_statistics.text())
 
         for stack in self.result_cards:
             while stack.count() > 0:

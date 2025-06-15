@@ -5,7 +5,7 @@ import threading
 import time
 from faker import Faker
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-from models.search import CVPersonalData, ApplicantProfile, ApplicationDetail
+from models.search import ApplicantProfile, ApplicationDetail
 
 """ SQL Queries """
 
