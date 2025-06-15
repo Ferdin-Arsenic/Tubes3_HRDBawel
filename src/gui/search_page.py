@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal
 from gui.input import InputFields
 from gui.result import ResultDisplay
-from models.search import SearchParams
+from models.search import SearchParams, SearchResult
 
 class SearchPage(QWidget):
     search_initiate = pyqtSignal(SearchParams)  # Signal to initiate search with parameters
@@ -45,9 +45,14 @@ class SearchPage(QWidget):
         input_fields.search_initiate.connect(self.search_initiate)
 
         # Result display in the right panel
-        result_display = ResultDisplay(right_panel)
-        result_display.view_summary.connect(self.view_summary)
-        result_display.view_cv.connect(self.view_cv)
+        self.result_display = ResultDisplay(right_panel)
+        self.result_display.view_summary.connect(self.view_summary)
+        self.result_display.view_cv.connect(self.view_cv)
 
         left_layout.addWidget(input_fields)
-        right_layout.addWidget(result_display)
+        right_layout.addWidget(self.result_display)
+
+    def show_results(self, results: SearchResult) -> None:
+        self.result_display.set_results(results)
+        self.result_display.display_results()
+        
