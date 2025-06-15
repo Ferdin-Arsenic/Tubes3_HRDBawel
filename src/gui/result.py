@@ -25,12 +25,7 @@ class ResultDisplay(QWidget):
         self.result_cards: list[QStackedWidget] = [QStackedWidget() for _ in range(self.results_per_page)]
 
         self.initialize_widgets(self.stack)
-        # TESTING FOR THIS. DELETEEEEEEEEEEEEEEEEEEEEE
-        test_data: list[ApplicantMatchData] = [
-            ApplicantMatchData(detail_id=i, name=f"Applicant {i}", match_count=i+1, matched_keywords={"python":1}) for i in range(10)
-        ]
-        self.set_results(SearchResult(applicants=[], cvs_scanned=102, runtime=100))
-        self.display_results()
+        
 
     """ Page Builder """
     def initialize_widgets(self, page_stack:QStackedWidget) -> None:
@@ -124,6 +119,7 @@ class ResultDisplay(QWidget):
             for card_stack in self.result_cards:
                 widget = card_stack.widget(self.current_page-1)
                 card_stack.setCurrentWidget(widget)
+            self.stack.setCurrentWidget(self.result_page)
 
     def set_results(self, results: SearchResult, is_fuzzy=False) -> None:
         self.page_count = (len(results.applicants) + self.results_per_page - 1) // self.results_per_page
