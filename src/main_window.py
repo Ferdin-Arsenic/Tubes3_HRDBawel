@@ -13,6 +13,7 @@ from lib.kmp import KMP
 from lib.bm import BM
 from lib.aho_corasick import aho_corasick
 from lib.levenshtein import levenshtein_distance
+from lib.regex import extractEdu, extractJob, extractSkill, extractSummary
 from database.cv_database import CVDatabase
 from util.parser import pdf_to_string
 
@@ -215,32 +216,10 @@ class MainWindow(QMainWindow):
 
         # TO DO: Dummy page. INTEGRATE NEXT
         # Dummy data for testing
-        cv_summary.description = "A brief summary of the applicant's qualifications and experience."
-        cv_summary.skills = ["Python", "Java", "C++", "Machine Learning", "Data Analysis"]
-        cv_summary.education = [
-            EducationEntry(
-                institution="University XYZ",
-                program="Bachelor of Science in Computer Science",
-                start_date="2010-01",
-                end_date="2014-01"
-            )
-        ]
-        cv_summary.work_experience = [
-            WorkExperienceEntry(
-                position="Software Engineer",
-                company="Company ABC",
-                start_date="2015-01",
-                end_date="2020-01",
-                description="Developed and maintained software applications using Python and Java."
-            ),
-            WorkExperienceEntry(
-                position="Senior Developer",
-                company="",
-                description="",
-                start_date="2020-01",
-                end_date=""
-            )
-        ]
+        cv_summary.description = extractSummary(app_detail.cv_path)
+        cv_summary.skills = extractSkill(app_detail.cv_path)
+        cv_summary.education = extractEdu(app_detail.cv_path)
+        cv_summary.work_experience = extractJob(app_detail.cv_path)
 
         self.summary_page.set_summary(detail_id, cv_summary)
         self.stack.setCurrentWidget(self.summary_page)
