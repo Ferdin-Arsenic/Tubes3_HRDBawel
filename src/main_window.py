@@ -56,14 +56,6 @@ class MainWindow(QMainWindow):
         self.search_page.view_cv.connect(self.view_cv)
         self.summary_page.return_from_summary.connect(self.return_to_search)
 
-        # Dummy data for testing
-        from models.search import SearchResult, ApplicantMatchData
-        test_data: list[ApplicantMatchData] = [
-            ApplicantMatchData(detail_id=i, name=f"Applicant {i}", match_count=i+1, matched_keywords={"python":1}) for i in range(10)
-        ]
-        self.search_page.show_results(SearchResult(applicants=test_data, cvs_scanned=102, runtime=100))
-        print("MainWindow initialization complete")
-
     def show_search_page(self):
         """Method untuk kembali ke halaman search"""
         self.stack.setCurrentWidget(self.search_page)
@@ -108,13 +100,17 @@ class MainWindow(QMainWindow):
         for app in applications:
             cv_text = pdf_to_string(app.cv_path).lower() if app.cv_path else ""
             exact_matches: dict[str, int] = {}
-            for keyword in search_params.keywords:
-                keyword_lower = keyword.strip().lower()
-                if not keyword_lower: continue
+            if search_params.algorithm == SearchAlgorithm.AHO_CORASICK:
+                matches = aho_corasick(cv_text, search_params.keywords)
+                exact_matches = {k: len(v) for k, v in matches.items() if v}
+            else:
+                for keyword in search_params.keywords:
+                    keyword_lower = keyword.strip().lower()
+                    if not keyword_lower: continue
 
-                occurrences = search_function(cv_text, keyword_lower)
-                if occurrences:
-                    exact_matches[keyword] = len(occurrences)
+                    occurrences = search_function(cv_text, keyword_lower)
+                    if occurrences:
+                        exact_matches[keyword] = len(occurrences)
             
             if exact_matches:
                 final_results[app.detail_id] = ApplicantMatchData(
