@@ -31,12 +31,14 @@ class ApplicantMatchData:
     name: str
     match_count: int
     matched_keywords: dict[str, int]
+    fuzzy_matched_keywords: dict[str, int] = None  # For fuzzy search, if applicable
 
 @dataclass
 class SearchResult:
     applicants: list[ApplicantMatchData]
     cvs_scanned: int
     runtime: float  # In milliseconds
+    fuzzy_runtime: float = 0.0  # In milliseconds, for fuzzy search if applicable
 
 @dataclass
 class SearchParams:
@@ -73,15 +75,6 @@ class CVSummary:
     work_experience: list[WorkExperienceEntry]
 
 """CV Extraction data"""
-@dataclass
-class CVPersonalData:
-    # Database
-    first_name: str
-    last_name: str
-    date_of_birth: datetime
-    address: str
-    phone_number: str
-
 @dataclass
 class CVSummaryExtraction:
     # Extracted at runtime
