@@ -4,6 +4,61 @@ import socket
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from models.search import CVPersonalData, ApplicantProfile, ApplicationDetail
+
+""" SQL Queries """
+
+CREATE_TABLES = '''
+    CREATE TABLE IF NOT EXISTS ApplicantProfile (
+        applicant_id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+        first_name VARCHAR(50) DEFAULT NULL,
+        last_name VARCHAR(50) DEFAULT NULL,
+        date_of_birth date DEFAULT NULL,
+        address VARCHAR(255) DEFAULT NULL,
+        phone_number VARCHAR(20) DEFAULT NULL
+    );
+    CREATE TABLE IF NOT EXISTS ApplicationDetail (
+        detail_id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+        applicant_id INT NOT NULL,
+        application_role VARCHAR(100) DEFAULT NULL,
+        cv_path TEXT,
+        FOREIGN KEY (applicant_id) REFERENCES ApplicantProfile(applicant_id) ON DELETE CASCADE
+    );
+'''
+
+MATCH_APPLICANT_ID = '''
+    SELECT applicant_id FROM ApplicantProfile
+    WHERE first_name = %s AND last_name = %s AND date_of_birth = %s
+    AND address = %s AND phone_number = %s
+    LIMIT 1;
+'''
+
+INSERT_NEW_APPLICANT_PROFILE = '''
+    INSERT INTO ApplicantProfile (first_name, last_name, date_of_birth, address, phone_number)
+    VALUES (%s, %s, %s, %s, %s);
+'''
+
+INSERT_NEW_APPLICATION_DETAIL = '''
+    INSERT INTO ApplicationDetail (applicant_id, application_role, cv_path)
+    VALUES (%s, %s, %s);
+'''
+
+SELECT_CV_PATH = '''
+    SELECT cv_path FROM ApplicationDetail WHERE detail_id = %s;
+'''
+
+SELECT_ALL_CV_PATH = '''
+    SELECT cv_path FROM ApplicationDetail;
+'''
+
+SELECT_APPLICATION_DETAIL = '''
+    SELECT * FROM ApplicationDetail WHERE detail_id = %s;
+'''
+
+SELECT_APPLICANT_PROFILE = '''
+    SELECT * FROM ApplicantProfile WHERE applicant_id = %s;
+'''
+
 
 try:
     import mysql.connector
@@ -12,11 +67,7 @@ except ImportError:
     print("MySQL connector not available. Database features will be disabled.")
     MYSQL_AVAILABLE = False
 
-class CVExtractor:
-    def extract_data():
-        pass
-
-class CvDatabase:
+class CVDatabase:
     def __init__(self):
         self.db_name = "ats_cv_hrdbawel"
         self.connection = None
@@ -29,7 +80,6 @@ class CvDatabase:
         print("Checking if MySQL server is running...")
         if not self._is_mysql_running():
             print("MySQL server is not running or not accessible on localhost:3306")
-            print("Continuing in file-based mode...")
             return
             
         try:
@@ -37,7 +87,7 @@ class CvDatabase:
             self.connect()
             
             if self.connection is None:
-                print("Failed to establish database connection, using file-based mode")
+                print("Failed to establish database connection")
                 return
                 
             cursor = self.connection.cursor()
@@ -72,33 +122,37 @@ class CvDatabase:
         cursor.execute(f"CREATE DATABASE {self.db_name}")
         cursor.execute(f"USE {self.db_name}")
 
-        cursor.execute('''
-            CREATE TABLE ApplicantProfile (
-                applicant_id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-                first_name VARCHAR(50) DEFAULT NULL,
-                last_name VARCHAR(50) DEFAULT NULL,
-                date_of_birth date DEFAULT NULL,
-                address VARCHAR(255) DEFAULT NULL,
-                phone_number VARCHAR(20) DEFAULT NULL
-            );
-        ''')
-
-        cursor.execute('''
-            CREATE TABLE ApplicationDetail (
-                detail_id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-                applicant_id INT NOT NULL,
-                application_role VARCHAR(100) DEFAULT NULL,
-                cv_path TEXT,
-                content TEXT,
-                FOREIGN KEY (applicant_id) REFERENCES ApplicantProfile(applicant_id) ON DELETE CASCADE
-            );
-        ''')
+        cursor.execute(CREATE_TABLES)
+        
+        cursor.commit()
+        cursor.close()
     
-    def seed_database(self, cursor, data_directory):
-        for file in os.listdir(data_directory):
+    def seed_database(self, relative_data_directory, role=""):
+        if role == "":
+            role = "Unknown"
+        cursor = self.connection.cursor()
+        for file in os.listdir(relative_data_directory):
             if file.endswith('.pdf'):
-                cv_path = os.path.join(data_directory, file)
-                cv_data = CVExtractor.extract_data(cv_path)
+                cv_path = os.path.join(relative_data_directory, file)
+                cv_data: CVPersonalData | None = None       # TO DO: Implement extractor
+                # cv_data = CVExtractor.extract_data(cv_path)
+                if cv_data is None:
+                    continue
+
+                # Check if personal data already exists, if not insert it
+                cursor.execute(MATCH_APPLICANT_ID, (cv_data.first_name, cv_data.last_name, cv_data.date_of_birth))
+                applicant_id = cursor.fetchone()
+                if applicant_id is None:
+                    cursor.execute(INSERT_NEW_APPLICANT_PROFILE, (
+                        cv_data.first_name, cv_data.last_name, cv_data.date_of_birth,
+                        cv_data.address, cv_data.phone_number
+                    ))
+                    applicant_id = cursor.lastrowid
+                
+                # Insert application detail
+                cursor.execute(INSERT_NEW_APPLICATION_DETAIL, (applicant_id, role, cv_path))
+        cursor.commit()
+        cursor.close()
 
     def _connect_with_timeout(self):
         """Internal method to create MySQL connection with proper timeout handling"""
@@ -163,38 +217,64 @@ class CvDatabase:
             print("Database connection closed.")
 
     def get_cv_path(self, detail_id: int) -> str | None:
-        print(f"DATABASE: Searching CV Path for detail_id: {detail_id}")
-        return f"dataset/pdf/{detail_id}.pdf"
-
-    def get_applicant_data(self, detail_id: int) -> dict | None:
-        print(f"DATABASE: Searching data for detail_id: {detail_id}")
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-        txt_path = os.path.join(base_dir, 'dataset', 'txt', f'{detail_id}.txt')
-        
-        try:
-            with open(txt_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            name_search = re.search(r'([a-zA-Z\s]+)\n', content)
-            name = name_search.group(1).strip().title() if name_search else f"Applicant {detail_id}"
-
-            return {"name": name, "content": content}
-        except FileNotFoundError:
-            return {"name": f"Applicant {detail_id}", "content": "File konten tidak ditemukan."}
-        except Exception as e:
-            print(f"Error reading file for {detail_id}: {e}")
+        if not self.connection:
+            print("Database connection is not established.")
             return None
+        with self.connection.cursor() as cursor:
+            cursor = self.connection.cursor()
+            cursor.execute(SELECT_CV_PATH, (detail_id,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+
+    def get_all_cv_path(self) -> list[str] | None:
+        if not self.connection:
+            print("Database connection is not established.")
+            return None
+        with self.connection.cursor() as cursor:
+            cursor.execute(SELECT_ALL_CV_PATH)
+            results = cursor.fetchall()
+            return [row[0] for row in results if row[0] is not None]
+
+    def get_application_detail(self, detail_id: int) -> ApplicationDetail | None:
+        if not self.connection:
+            print("Database connection is not established.")
+            return None
+        with self.connection.cursor() as cursor:
+            cursor.execute(SELECT_APPLICATION_DETAIL, (detail_id,))
+            result = cursor.fetchone()
+            if result:
+                return ApplicationDetail(
+                    detail_id=result[0],
+                    applicant_id=result[1],
+                    application_role=result[2],
+                    cv_path=result[3]
+                )
+            return None
+
+    def get_applicant_profile(self, applicant_id: int) -> ApplicantProfile | None:
+        if not self.connection:
+            print("Database connection is not established.")
+            return None
+        with self.connection.cursor() as cursor:
+            cursor.execute(SELECT_APPLICANT_PROFILE, (applicant_id,))
+            result = cursor.fetchone()
+            if result:
+                return ApplicantProfile(
+                    applicant_id=result[0],
+                    first_name=result[1],
+                    last_name=result[2],
+                    date_of_birth=result[3],
+                    address=result[4],
+                    phone_number=result[5]
+                )
+            return None
+        
 
 if __name__ == "__main__":
     print("=== MySQL Connection Test ===")
     db = CvDatabase()
     if db.connection:
-        print("✓ Database connection successful and initialized.")
+        print("Database connection established successfully.")
         db.close()
     else:
-        print("✗ Running in file-based mode.")
-        print("\nTo fix this:")
-        print("1. Install MySQL/XAMPP/WAMP")
-        print("2. Start MySQL service") 
-        print("3. Make sure it's running on localhost:3306")
-        print("4. Default user 'root' with empty password should work")
-        print("5. If still hanging, try restarting XAMPP MySQL service")
+        print("Database connection failed or not initialized.")

@@ -13,7 +13,8 @@ from lib.kmp import KMP
 from lib.bm import BM
 from lib.aho_corasick import aho_corasick
 from lib.levenshtein import levenshtein_distance
-from database.cv_database import CvDatabase
+from database.cv_database import CVDatabase
+from util.parser import pdf_to_string
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -28,7 +29,7 @@ class MainWindow(QMainWindow):
         # Initialize database with error handling
         try:
             print("Initializing database...")
-            self.db = CvDatabase()
+            self.db = CVDatabase()
             print("Database initialized successfully")
         except Exception as e:
             print(f"Database initialization failed: {e}")

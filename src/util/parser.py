@@ -1,6 +1,14 @@
 import fitz  # PyMuPDF
 import os
 
+def pdf_to_string(pdf_path):
+    doc = fitz.open(pdf_path)
+    all_text = []
+    for page in doc:
+        text = page.get_text().replace("\n", " ").replace("\r", " ").lower()
+        all_text.append(text)
+    return " ".join(all_text)
+
 def pdf_to_text(pdf_path, txt_output_path):
     doc = fitz.open(pdf_path)
     all_text = ""
