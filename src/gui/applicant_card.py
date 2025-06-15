@@ -64,7 +64,12 @@ class ApplicantCard(QWidget):
 class KeywrodsMatchedTable(QTableWidget):
     def __init__(self, data: ApplicantMatchData, parent=None):
         super().__init__(parent)
-        self.setRowCount(len(data.matched_keywords))
+
+        all_matches = data.matched_keywords.copy()
+        if data.fuzzy_matched_keywords:
+            all_matches.update(data.fuzzy_matched_keywords)
+
+        self.setRowCount(len(all_matches))
         self.setColumnCount(2)
         self.setStyleSheet("font-size: 12px; font-family: Inter, sans-serif; color: #000000; border: none;")
         self.setFixedWidth(150)
@@ -80,7 +85,8 @@ class KeywrodsMatchedTable(QTableWidget):
         self.setColumnWidth(1, 10)
         font_metrics = self.fontMetrics()
         row_height = font_metrics.height()
-        for row, (keyword, freq) in enumerate(data.matched_keywords.items()):
+
+        for row, (keyword, freq) in enumerate(all_matches.items()):
             keyword_item = QTableWidgetItem(keyword)
             keyword_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             freq_item = QTableWidgetItem(str(freq))
